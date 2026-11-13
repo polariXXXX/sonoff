@@ -1,4 +1,4 @@
-let token = '', latest = null;
+let token = '', latest = null, receivedAt = 0, stateAvailable = false;
 const $ = s => document.querySelector(s);
 function notify(message) { $('#notice').textContent = message; }
 async function api(path, body, method = 'POST') {
@@ -31,10 +31,28 @@ function card(s) {
   };
   return node;
 }
+function renderCountdowns() {
+  if (!latest) return;
+  const elapsed = (performance.now() - receivedAt) / 1000;
+  for (const s of latest.sockets) {
+    const node = [...$('#sockets').children].find(x => x.dataset.id === s.device_id);
+    if (!node) continue;
+    if (!stateAvailable) {
+      node.querySelector('.turn-on-time').textContent = '—';
+      node.querySelector('.turn-on-note').textContent = 'Немає зв’язку із сервісом';
+      continue;
+    }
+    const seconds = s.confirmed === 'on' ? 0 : Math.max(0, Math.ceil(s.turn_on_remaining_seconds - elapsed));
+    node.querySelector('.turn-on-time').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+    node.querySelector('.turn-on-note').textContent = s.confirmed === 'on' ? 'Пристрій уже увімкнений' : s.turn_on_scheduled ? (seconds > 0 ? 'Очікуємо стабільне живлення' : 'Очікуємо виконання команди') : 'Увімкнення не заплановане';
+    const remaining = Math.max(0, Math.ceil((s.remaining_seconds || 0) - elapsed));
+    node.querySelector('.timer').textContent = s.desired === 'off' && s.remaining_seconds !== null ? (remaining > 0 ? 'Вимкнення через ' + Math.floor(remaining / 60) + ':' + String(remaining % 60).padStart(2, '0') : 'Вимкнення очікує виконання') : '';
+  }
+}
 async function refresh() {
   try {
     const response = await fetch('/api/state'); if (!response.ok) throw new Error('Потрібна авторизація');
-    latest = await response.json(); token=latest.control_token;
+    latest = await response.json(); receivedAt = performance.now(); stateAvailable = true; token=latest.control_token;
     $('#mode').textContent=latest.simulation?'СИМУЛЯЦІЯ':'LIVE';
     $('#mains').textContent=latest.mains===true?'Живлення стабільне':latest.mains===false?'Живлення відсутнє':'Стан невідомий';
     $('#mains').className=latest.mains===true?'good':'bad';
@@ -50,13 +68,12 @@ async function refresh() {
       const status=node.querySelector('.status');status.textContent=s.confirmed==='on'?'УВІМКНЕНО':s.confirmed==='off'?'ВИМКНЕНО':'НЕВІДОМО';
       status.className='badge status '+(s.confirmed==='on'?'good':'');
       node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'} · ${s.device_id}${s.updated_at?' · '+new Date(s.updated_at*1000).toLocaleTimeString('uk-UA'):''}`;
-      const n=Math.ceil(s.remaining_seconds||0);
-      node.querySelector('.timer').textContent=s.remaining_seconds!==null?`${s.desired==='on'?'Увімкнення':'Вимкнення'} ${n>0?'через '+Math.floor(n/60)+':'+String(n%60).padStart(2,'0'):'очікує виконання'}`:'Немає запланованих дій';
       node.querySelector('.socket-error').textContent=s.error||'';
       node.querySelector('[data-command=on]').disabled=latest.mains!==true;
     }
+    renderCountdowns();
     $('#events').replaceChildren(...latest.events.map(e=>{const row=el('div','','event');row.append(el('time',new Date(e.ts*1000).toLocaleString('uk-UA')),el('span',e.message));return row;}));
-  } catch(error) {notify('Зв’язок із сервісом втрачено: '+error.message); $('#mains').textContent='Стан недоступний';document.querySelectorAll('[data-command]').forEach(b=>b.disabled=true);}
+  } catch(error) {stateAvailable = false; renderCountdowns(); notify('Зв’язок із сервісом втрачено: '+error.message); $('#mains').textContent='Стан недоступний';document.querySelectorAll('[data-command]').forEach(b=>b.disabled=true);}
 }
 $('#authorize').onclick=async()=>{try{const data=await api('/api/oauth/start',{});window.location.assign(data.url);}catch(error){notify(error.message);}};
 $('#discover').onclick=async()=>{try{
@@ -71,4 +88,4 @@ $('#discover').onclick=async()=>{try{
   }
 }catch(error){notify(error.message);}};
 document.querySelectorAll('[data-sim]').forEach(b=>b.onclick=async()=>{try{await api('/api/simulation',{present:JSON.parse(b.dataset.sim)});await refresh();}catch(error){notify(error.message);}});
-refresh();setInterval(refresh,1000);
+refresh();setInterval(refresh,1000);setInterval(renderCountdowns,250);

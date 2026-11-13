@@ -98,6 +98,17 @@ class Engine:
         state = self.runtime[socket.device_id]
         async with state.lock:
             socket = next(s for s in self.config.sockets if s.device_id == socket.device_id)
+            observed = self.cloud.status(socket)
+            if (
+                state.desired == "on"
+                and state.due is not None
+                and observed["online"] is True
+                and observed["confirmed"] == "on"
+            ):
+                state.generation += 1
+                state.due, state.error, state.manual_request = None, None, False
+                state.attempts = 0
+                self.store.event(f"Розетка вже увімкнена; таймер ON скасовано: {socket.name}")
             if state.due is None or self.clock() < state.due:
                 return
             if state.desired == "on" and self.present is not True:
@@ -129,18 +140,23 @@ class Engine:
         await asyncio.gather(*(self.execute(s) for s in list(self.config.sockets)))
 
     def snapshot(self):
-        return {
-            "mains": self.present,
-            "sockets": [
+        sockets = []
+        for socket in self.config.sockets:
+            state = self.runtime[socket.device_id]
+            observed = self.cloud.status(socket)
+            remaining = max(0, state.due - self.clock()) if state.due is not None else None
+            on_scheduled = (
+                state.desired == "on" and remaining is not None and observed["confirmed"] != "on"
+            )
+            sockets.append(
                 {
-                    **s.model_dump(),
-                    **self.cloud.status(s),
-                    "desired": self.runtime[s.device_id].desired,
-                    "remaining_seconds": max(0, self.runtime[s.device_id].due - self.clock())
-                    if self.runtime[s.device_id].due is not None
-                    else None,
-                    "error": self.runtime[s.device_id].error,
+                    **socket.model_dump(),
+                    **observed,
+                    "desired": state.desired,
+                    "remaining_seconds": remaining,
+                    "turn_on_scheduled": on_scheduled,
+                    "turn_on_remaining_seconds": remaining if on_scheduled else 0,
+                    "error": state.error,
                 }
-                for s in self.config.sockets
-            ],
-        }
+            )
+        return {"mains": self.present, "sockets": sockets}

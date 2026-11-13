@@ -161,3 +161,48 @@ def test_restart_does_not_restore_elapsed_on_delay(setup):
     replacement = Engine(engine.config, cloud, store, clock)
     replacement.sample(True)
     assert replacement.runtime["boiler"].due == 2390
+
+
+async def test_countdown_ticks_and_reaches_zero_after_manual_on(setup):
+    engine, cloud, clock, _ = setup
+    engine.sample(True)
+    assert engine.snapshot()["sockets"][0]["turn_on_remaining_seconds"] == 1200
+    clock.now = 123
+    assert engine.snapshot()["sockets"][0]["turn_on_remaining_seconds"] == 1077
+    engine.manual("boiler", "on")
+    await engine.tick()
+    snapshot = engine.snapshot()["sockets"][0]
+    assert snapshot["confirmed"] == "on"
+    assert snapshot["turn_on_remaining_seconds"] == 0
+    assert snapshot["turn_on_scheduled"] is False
+
+
+async def test_external_early_on_cancels_timer_and_sends_no_duplicate(setup):
+    engine, cloud, clock, _ = setup
+    engine.sample(True)
+    clock.now = 100
+    await cloud.switch(engine.config.sockets[0], "on")
+    await engine.tick()
+    assert engine.runtime["boiler"].due is None
+    assert engine.snapshot()["sockets"][0]["turn_on_remaining_seconds"] == 0
+    original_update = cloud.status(engine.config.sockets[0])["updated_at"]
+    clock.now = 1200
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["updated_at"] == original_update
+
+
+async def test_offline_last_known_on_does_not_cancel_pending_on(setup):
+    engine, cloud, _, _ = setup
+    engine.sample(True)
+    cloud.devices["boiler"] = {"online": False, "params": {"switch": "on"}}
+    await engine.tick()
+    assert engine.runtime["boiler"].due == 1200
+
+
+def test_no_on_countdown_when_only_off_is_pending(setup):
+    engine, _, _, _ = setup
+    engine.sample(False)
+    snapshot = engine.snapshot()["sockets"][0]
+    assert snapshot["desired"] == "off"
+    assert snapshot["turn_on_remaining_seconds"] == 0
+    assert snapshot["turn_on_scheduled"] is False

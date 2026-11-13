@@ -114,7 +114,12 @@ async function refresh() {
       node.classList.toggle('unavailable',s.online!==true);
       const lastState = s.confirmed==='on'?'увімкнений':s.confirmed==='off'?'вимкнений':'невідомий';
       node.querySelector('.availability-info').textContent=s.online===true?'':`${s.online===false?'Пристрій офлайн у eWeLink':latest.cloud_connected?'Пристрій відсутній у списку порталу або ще не синхронізований':'Зв’язок із eWeLink недоступний'}. Останній відомий стан: ${lastState}. Показники можуть бути застарілими.`;
-      node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим · датчик не керує'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'}`;
+      const automatic = s.mode === 'auto';
+      const modeIndicator = node.querySelector('.mode-indicator');
+      modeIndicator.textContent = automatic ? 'Автоматичний' : 'Ручний';
+      modeIndicator.className = 'mode-indicator ' + (automatic ? 'mode-auto' : 'mode-manual');
+      modeIndicator.title = automatic ? 'Датчик керує за налаштованими правилами' : 'Датчик не керує; поверніться в автоматичний режим для застосування правил';
+      node.querySelector('.connection').textContent=`${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'}`;
       node.querySelector('.device-identifiers').textContent=`ID: ${s.device_id}${s.updated_at?' · Оновлено '+new Date(s.updated_at*1000).toLocaleString('uk-UA'):''}`;
       node.querySelector('.socket-error').textContent=s.error||'';
       const onReason = s.online !== true ? 'Керування недоступне: розетка не має підтвердженого зв’язку з eWeLink.' : '';
@@ -125,7 +130,10 @@ async function refresh() {
       const offButton = node.querySelector('[data-command=off]');
       offButton.disabled = s.online !== true;
       offButton.title = s.online !== true ? 'Розетка недоступна в eWeLink' : 'Вимкнути розетку вручну';
-      node.querySelector('[data-command=auto]').disabled=false;
+      const autoButton = node.querySelector('[data-command=auto]');
+      autoButton.disabled = false;
+      autoButton.setAttribute('aria-pressed', String(automatic));
+      autoButton.classList.toggle('active-mode', automatic);
     }
     renderCountdowns();
     $('#events').replaceChildren(...latest.events.map(e=>{const row=el('div','','event');row.append(el('time',new Date(e.ts*1000).toLocaleString('uk-UA')),el('span',e.message));return row;}));

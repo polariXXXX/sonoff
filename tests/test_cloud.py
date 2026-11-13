@@ -103,3 +103,41 @@ def test_token_file_import_normalizes_oauth_response(tmp_path):
         )
     )
     assert load_tokens(path) == {"at": "test-at", "rt": "test-rt", "region": "eu", "expires": 123}
+
+
+def test_device_metadata_and_photo_mapping_do_not_expose_private_fields():
+    from sonoff.cloud import decode_device
+
+    device = decode_device(
+        {
+            "itemType": 1,
+            "itemData": {
+                "deviceid": "boiler",
+                "productModel": "THR316",
+                "brandName": "SONOFF",
+                "devicekey": "private-key",
+                "params": {
+                    "switch": "on",
+                    "currentTemperature": "14.6",
+                    "currentHumidity": "66.6",
+                    "rssi": -66,
+                    "fwVersion": "1.3.0",
+                    "ssid": "private-network",
+                    "bindInfos": {"token": "secret"},
+                },
+            },
+        }
+    )
+    status = socket_status(device, None)
+    assert status["product_model"] == "THR316"
+    assert status["temperature"] == "14.6"
+    assert status["image_url"] == "/static/models/th-origin.jpg"
+    assert "private-key" not in str(device)
+    assert "private-network" not in str(device)
+    assert "secret" not in str(device)
+
+
+def test_unknown_model_uses_honest_generic_image():
+    status = socket_status({"product_model": "unknown", "params": {}}, None)
+    assert status["image_is_generic"] is True
+    assert status["image_url"].endswith("device.svg")

@@ -10,6 +10,8 @@ from sonoff.app import create_app
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("WEB_PASSWORD", "test-password-with-32-characters")
     monkeypatch.setenv("CLOUD_BACKEND", "mock")
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("SENSOR_BACKEND", raising=False)
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     config = tmp_path / "config.json"

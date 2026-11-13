@@ -19,8 +19,9 @@ class Runtime:
 class Engine:
     """Timers are disposable: startup and every raw reversal invalidate ON deadlines."""
 
-    def __init__(self, config: Config, cloud, store, clock=time.monotonic):
+    def __init__(self, config: Config, cloud, store, clock=time.monotonic, notifier=None):
         self.config, self.cloud, self.store, self.clock = config, cloud, store, clock
+        self.notifier = notifier
         self.raw = None
         self.present = None
         self.changed = clock()
@@ -59,6 +60,8 @@ class Engine:
         )
         if stable != self.present:
             self.present = stable
+            if self.notifier:
+                self.notifier.mains(stable)
             self.store.event(f"Мережа: { {True: 'є', False: 'немає', None: 'невідомо'}[stable] }")
             for socket in self.config.sockets:
                 self.schedule(socket)
@@ -105,6 +108,10 @@ class Engine:
                 and observed["online"] is True
                 and observed["confirmed"] == "on"
             ):
+                if state.attempts > 0 and self.notifier:
+                    self.notifier.switched(
+                        socket.name, "on", "manual" if state.manual_request else "auto"
+                    )
                 state.generation += 1
                 state.due, state.error, state.manual_request = None, None, False
                 state.attempts = 0
@@ -118,6 +125,7 @@ class Engine:
             if socket.mode != "auto" and not state.manual_request and not safety_off:
                 return
             generation, desired = state.generation, state.desired
+            source = "manual" if state.manual_request else "auto"
             try:
                 await self.cloud.switch(
                     socket,
@@ -133,6 +141,8 @@ class Engine:
                     self.store.event(f"Помилка керування: {socket.name}")
             else:
                 self.store.event(f"Команда {desired.upper()} прийнята: {socket.name}")
+                if self.notifier:
+                    self.notifier.switched(socket.name, desired, source)
                 if generation == state.generation:
                     state.due, state.error, state.manual_request = None, None, False
 

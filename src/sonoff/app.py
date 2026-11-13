@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from .cloud import EWeLink, MockCloud
 from .config import Config, Socket
 from .engine import Engine
+from .notifications import Telegram
 from .sensor import GPIOSensor, MockSensor
 from .store import Store
 
@@ -88,7 +89,9 @@ def create_app():
             await cloud.close()
             store.close()
             raise
-        engine = Engine(config, cloud, store)
+        telegram = Telegram(store, os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID"))
+        engine = Engine(config, cloud, store, notifier=telegram)
+        app.state.telegram = telegram
         app.state.engine, app.state.cloud, app.state.sensor, app.state.store = (
             engine,
             cloud,
@@ -123,7 +126,7 @@ def create_app():
                 await cloud.poll(list(config.sockets))
                 await asyncio.sleep(120)
 
-        tasks = [asyncio.create_task(fn()) for fn in (monitor, control, sync)]
+        tasks = [asyncio.create_task(fn()) for fn in (monitor, control, sync, telegram.run)]
         app.state.tasks = tasks
         try:
             yield
@@ -132,6 +135,7 @@ def create_app():
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             sensor.close()
+            await telegram.close()
             await cloud.close()
             store.close()
 
@@ -184,6 +188,7 @@ def create_app():
             "simulation": backend == "mock",
             "sensor_simulation": isinstance(app.state.sensor, MockSensor),
             "control_token": control_token,
+            "telegram": app.state.telegram.status(),
         }
 
     @app.put("/api/sockets/{device_id}", dependencies=[Depends(mutation)])

@@ -61,10 +61,22 @@ async function refresh() {
     $('#simulation').hidden=!latest.sensor_simulation;
     $('#authorize').hidden=latest.simulation;
     if(latest.cloud_error) notify(latest.cloud_error);
+    const tg = latest.telegram;
+    $('#telegram-status').textContent = tg?.enabled ? `Telegram увімкнено · у черзі ${tg.pending} · недоставлених ${tg.failed}${tg.error ? ' · ' + tg.error : ''}` : 'Telegram не налаштований';
     const container=$('#sockets');
     for(const s of latest.sockets) {
       let node=[...container.children].find(x=>x.dataset.id===s.device_id);
       if(!node){node=card(s);container.append(node);}
+      const image = node.querySelector('.device-photo');
+      if (image.getAttribute('src') !== s.image_url) image.src = s.image_url;
+      image.alt = s.image_is_generic ? 'Типове зображення пристрою' : `${s.brand || 'SONOFF'} ${s.product_model || ''}`;
+      node.querySelector('.device-model').textContent = [s.brand, s.product_model].filter(Boolean).join(' · ') || 'Модель ще не отримано';
+      node.querySelector('.device-details').textContent = [s.firmware ? 'Прошивка ' + s.firmware : '', s.uiid != null ? 'UIID ' + s.uiid : '', s.image_is_generic ? 'Типове зображення' : 'Фото моделі'].filter(Boolean).join(' · ');
+      const metrics = [];
+      for (const [label,value,unit] of [['Температура',s.temperature,s.temperature_unit || '°C'],['Вологість',s.humidity,'%'],['Wi-Fi',s.rssi,'dBm']]) {
+        if (value !== null && value !== undefined && value !== '') { const metric = el('div','','metric'); metric.append(el('span',label),el('strong',`${value} ${unit}`)); metrics.push(metric); }
+      }
+      node.querySelector('.telemetry').replaceChildren(...metrics);
       const status=node.querySelector('.status');status.textContent=s.confirmed==='on'?'УВІМКНЕНО':s.confirmed==='off'?'ВИМКНЕНО':'НЕВІДОМО';
       status.className='badge status '+(s.confirmed==='on'?'good':'');
       node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'} · ${s.device_id}${s.updated_at?' · '+new Date(s.updated_at*1000).toLocaleTimeString('uk-UA'):''}`;

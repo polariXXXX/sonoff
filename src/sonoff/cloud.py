@@ -26,13 +26,39 @@ def sign(secret: str, message: str):
     ).decode()
 
 
+def safe_params(raw):
+    # Expose only control parameters and telemetry, never SSIDs, bindInfos or credentials.
+    params = {
+        key: raw[key]
+        for key in (
+            "switch",
+            "currentTemperature",
+            "currentHumidity",
+            "rssi",
+            "fwVersion",
+            "tempUnit",
+        )
+        if key in raw
+    }
+    if "switches" in raw:
+        params["switches"] = [
+            {"outlet": entry.get("outlet"), "switch": entry.get("switch")}
+            for entry in raw["switches"]
+            if isinstance(entry, dict)
+        ]
+    return params
+
+
 def decode_device(item):
     data = item.get("itemData", {})
+    params = safe_params(data.get("params", {}))
     return {
         "device_id": data.get("deviceid"),
         "name": data.get("name", "Sonoff"),
         "online": data.get("online", False),
-        "params": data.get("params", {}),
+        "params": params,
+        "brand": data.get("brandName"),
+        "product_model": data.get("productModel"),
         "uiid": data.get("extra", {}).get("uiid"),
         "item_type": item.get("itemType", 1),
         "updated_at": time.time(),
@@ -40,20 +66,29 @@ def decode_device(item):
 
 
 def socket_status(device, channel):
-    value = device.get("params", {}).get("switch")
+    params = device.get("params", {})
+    value = params.get("switch")
     if channel is not None:
         value = next(
-            (
-                s.get("switch")
-                for s in device.get("params", {}).get("switches", [])
-                if s.get("outlet") == channel
-            ),
+            (s.get("switch") for s in params.get("switches", []) if s.get("outlet") == channel),
             None,
         )
+    model = device.get("product_model") or ""
+    has_photo = model.upper() in ("THR316", "THR320")
     return {
         "confirmed": value if value in ("on", "off") else None,
         "online": device.get("online"),
         "updated_at": device.get("updated_at"),
+        "brand": device.get("brand"),
+        "product_model": model or None,
+        "uiid": device.get("uiid"),
+        "firmware": params.get("fwVersion"),
+        "temperature": params.get("currentTemperature"),
+        "temperature_unit": "°F" if params.get("tempUnit") == 1 else "°C",
+        "humidity": params.get("currentHumidity"),
+        "rssi": params.get("rssi"),
+        "image_url": "/static/models/th-origin.jpg" if has_photo else "/static/models/device.svg",
+        "image_is_generic": not has_photo,
     }
 
 
@@ -75,10 +110,11 @@ class MockCloud:
             else {"switches": [{"outlet": socket.channel, "switch": action}]}
         )
         self.devices[socket.device_id] = {
+            **self.devices.get(socket.device_id, {}),
             "device_id": socket.device_id,
             "name": socket.name,
             "online": True,
-            "params": params,
+            "params": {**self.devices.get(socket.device_id, {}).get("params", {}), **params},
             "updated_at": time.time(),
         }
 
@@ -323,7 +359,10 @@ class EWeLink:
         data = await self.request(
             "GET", "/v2/device/thing/status", params={"type": 1, "id": socket.device_id}
         )
-        device["params"], device["updated_at"] = data.get("params", {}), time.time()
+        device["params"], device["updated_at"] = (
+            {**device.get("params", {}), **safe_params(data.get("params", {}))},
+            time.time(),
+        )
         if self.status(socket)["confirmed"] != action:
             raise ValueError("Device has not confirmed requested state")
 

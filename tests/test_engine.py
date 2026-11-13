@@ -1,0 +1,163 @@
+import asyncio
+
+import pytest
+
+from sonoff.cloud import MockCloud
+from sonoff.config import Config, Rule, SensorConfig, Socket
+from sonoff.engine import Engine
+from sonoff.store import Store
+
+
+class Clock:
+    now = 0
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.fixture
+def setup(tmp_path):
+    clock, cloud, store = Clock(), MockCloud(), Store(tmp_path)
+    config = Config(
+        sensor=SensorConfig(debounce_seconds=0), sockets=[Socket(device_id="boiler", name="Бойлер")]
+    )
+    engine = Engine(config, cloud, store, clock)
+    yield engine, cloud, clock, store
+    store.close()
+
+
+async def test_outage_off_immediate_and_return_waits_twenty_minutes(setup):
+    engine, cloud, clock, _ = setup
+    engine.sample(False)
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+    engine.sample(True)
+    clock.now = 1199
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+    clock.now = 1200
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
+
+
+async def test_brief_interruption_restarts_full_delay(setup):
+    engine, cloud, clock, _ = setup
+    engine.sample(True)
+    clock.now = 1199
+    engine.sample(False)
+    await engine.tick()
+    engine.sample(True)
+    clock.now = 1201
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+    clock.now = 2399
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
+
+
+async def test_sockets_have_independent_delays(setup):
+    engine, cloud, clock, _ = setup
+    engine.update(
+        Socket(device_id="other", name="Other", mains_present=Rule(action="on", delay_minutes=1))
+    )
+    engine.sample(True)
+    clock.now = 60
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[1])["confirmed"] == "on"
+    assert cloud.status(engine.config.sockets[0])["confirmed"] is None
+
+
+async def test_unknown_cancels_pending_on(setup):
+    engine, cloud, clock, _ = setup
+    engine.sample(True)
+    engine.sample(None)
+    clock.now = 1300
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] is None
+    with pytest.raises(ValueError):
+        engine.manual("boiler", "on")
+
+
+async def test_manual_on_is_still_switched_off_during_outage(setup):
+    engine, cloud, _, _ = setup
+    engine.sample(True)
+    engine.manual("boiler", "on")
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
+    engine.sample(False)
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+    engine.sample(True)
+    assert engine.runtime["boiler"].due is None
+
+
+async def test_config_change_invalidates_existing_deadline(setup):
+    engine, _, clock, _ = setup
+    engine.sample(True)
+    clock.now = 600
+    engine.update(Socket(device_id="boiler", name="Changed"))
+    assert engine.runtime["boiler"].due == 1800
+
+
+async def test_retry_does_not_replay_obsolete_on(setup):
+    engine, _, clock, _ = setup
+
+    class FailingCloud(MockCloud):
+        actions = []
+
+        async def switch(self, socket, action, valid=lambda: True):
+            self.actions.append(action)
+            raise OSError("offline")
+
+    engine.cloud = cloud = FailingCloud()
+    engine.sample(True)
+    clock.now = 1200
+    await engine.tick()
+    engine.sample(False)
+    clock.now = 1220
+    await engine.tick()
+    assert cloud.actions == ["on", "off"]
+
+
+async def test_command_is_rechecked_after_network_queue_wait(setup):
+    engine, _, clock, _ = setup
+    entered, resume = asyncio.Event(), asyncio.Event()
+
+    class DelayedCloud(MockCloud):
+        async def switch(self, socket, action, valid=lambda: True):
+            entered.set()
+            await resume.wait()
+            await super().switch(socket, action, valid)
+
+    engine.cloud = cloud = DelayedCloud()
+    engine.sample(True)
+    clock.now = 1200
+    task = asyncio.create_task(engine.tick())
+    await entered.wait()
+    engine.sample(False)
+    resume.set()
+    await task
+    assert cloud.status(engine.config.sockets[0])["confirmed"] is None
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+
+
+def test_debounce_presence_but_not_absence(setup):
+    engine, _, clock, _ = setup
+    engine.config.sensor.debounce_seconds = 0.3
+    engine.sample(True)
+    assert engine.present is None
+    clock.now = 0.3
+    engine.sample(True)
+    assert engine.present is True
+    engine.sample(False)
+    assert engine.present is False
+
+
+def test_restart_does_not_restore_elapsed_on_delay(setup):
+    engine, cloud, clock, store = setup
+    engine.sample(True)
+    clock.now = 1190
+    replacement = Engine(engine.config, cloud, store, clock)
+    replacement.sample(True)
+    assert replacement.runtime["boiler"].due == 2390

@@ -1,0 +1,6 @@
+{
+  "sensor": {"backend": "mock", "chip": "/dev/gpiochip0", "line": 17, "present_level": 0, "debounce_seconds": 0.3},
+  "sockets": [
+    {"device_id": "demo-boiler", "name": "Бойлер", "channel": null, "mode": "auto", "mains_present": {"action": "on", "delay_minutes": 20}, "mains_absent": {"action": "off", "delay_minutes": 0}}
+  ]
+}

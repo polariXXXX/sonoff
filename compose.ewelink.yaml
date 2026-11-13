@@ -1,0 +1,7 @@
+services:
+  app:
+    environment:
+      CLOUD_BACKEND: ewelink
+      EWL_TOKEN_FILE: /run/secrets/ewelink-tokens.json
+    volumes:
+      - ../tokens.json:/run/secrets/ewelink-tokens.json:ro

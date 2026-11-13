@@ -1,0 +1,11 @@
+# Local live-cloud demo: Skvyra only, virtual sensor, localhost HTTP.
+services:
+  app:
+    environment:
+      CLOUD_BACKEND: ewelink
+      SENSOR_BACKEND: mock
+      ALLOW_SIMULATED_SENSOR: "true"
+      EWL_TOKEN_FILE: /run/secrets/ewelink-tokens.json
+    volumes:
+      - ./config/skvyra.example.json:/config/config.json:ro
+      - ../tokens.json:/run/secrets/ewelink-tokens.json:ro

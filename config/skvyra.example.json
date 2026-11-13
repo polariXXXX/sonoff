@@ -1,0 +1,6 @@
+{
+  "sensor": {"backend": "gpio", "chip": "/dev/gpiochip0", "line": 17, "present_level": 0, "debounce_seconds": 0.3},
+  "sockets": [
+    {"device_id": "10025391ef", "name": "Skvyra", "channel": null, "mode": "manual", "mains_present": {"action": "on", "delay_minutes": 20}, "mains_absent": {"action": "off", "delay_minutes": 0}}
+  ]
+}

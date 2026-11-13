@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==80.3.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sonoff-controller"
+version = "0.1.0"
+description = "Mains-aware Sonoff socket automation for Raspberry Pi"
+requires-python = ">=3.12"
+dependencies = ["fastapi==0.115.12", "httpx==0.28.1", "uvicorn==0.34.2", "pydantic==2.11.4"]
+
+[project.optional-dependencies]
+gpio = ["gpiod==2.3.0"]
+dev = ["pytest==8.3.5", "pytest-asyncio==0.26.0", "ruff==0.11.10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sonoff = ["static/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

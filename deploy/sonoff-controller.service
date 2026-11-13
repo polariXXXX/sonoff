@@ -1,0 +1,19 @@
+[Unit]
+Description=Sonoff mains monitor and HTTPS dashboard
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/sonoff
+ExecStart=/usr/bin/docker compose -f compose.yaml -f compose.gpio.yaml --profile https up -d --wait
+ExecStop=/usr/bin/docker compose -f compose.yaml -f compose.gpio.yaml --profile https stop
+TimeoutStartSec=180
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

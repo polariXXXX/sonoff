@@ -1,0 +1,10 @@
+services:
+  app:
+    environment:
+      SENSOR_BACKEND: gpio
+      GPIO_CHIP: /dev/gpiochip0
+      GPIO_LINE: "17"
+    devices:
+      - ${GPIO_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
+    group_add:
+      - ${GPIO_GID:?Set GPIO_GID to the host gpio device group ID}

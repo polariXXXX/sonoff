@@ -1,0 +1,12 @@
+{
+	email {$ACME_EMAIL}
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	@health path /healthz
+	respond @health 404
+	reverse_proxy app:8000
+}

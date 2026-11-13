@@ -107,3 +107,58 @@ def test_short_password_rejected(monkeypatch):
     monkeypatch.setenv("WEB_PASSWORD", "short")
     with pytest.raises(ValueError):
         create_app()
+
+
+def test_adding_device_triggers_image_lookup_and_secures_cached_image_route(client, monkeypatch):
+    cloud = client.app.state.cloud
+    cloud.devices["new"] = {
+        "device_id": "new",
+        "brand": "SONOFF",
+        "product_model": "THR316D",
+        "online": False,
+        "params": {"switch": "off"},
+    }
+    scheduled = []
+    monkeypatch.setattr(
+        client.app.state.images,
+        "schedule",
+        lambda device, force=False: scheduled.append((device["product_model"], force)),
+    )
+    headers = {"X-Control-Token": client.get("/api/state", auth=auth()).json()["control_token"]}
+    assert (
+        client.put(
+            "/api/sockets/new",
+            auth=auth(),
+            headers=headers,
+            json={"device_id": "new", "name": "New", "mode": "manual"},
+        ).status_code
+        == 200
+    )
+    assert scheduled == [("THR316D", False)]
+    assert (
+        client.post("/api/sockets/new/image", auth=auth(), headers=headers, json={}).status_code
+        == 200
+    )
+    assert scheduled[-1] == ("THR316D", True)
+    state = client.get("/api/state", auth=auth()).json()["sockets"]
+    assert next(s for s in state if s["device_id"] == "new")["online"] is False
+    assert client.get("/api/device-images/" + "a" * 64).status_code == 401
+    assert client.get("/api/device-images/" + "a" * 64, auth=auth()).status_code == 404
+
+
+def test_portal_link_removed_and_auto_button_explained(client):
+    response = client.get("/", auth=auth())
+    assert 'id="authorize"' not in response.text
+    assert "Автоматичний режим" in response.text
+    assert "Керувати пристроєм за правилами датчика" in response.text
+
+
+def test_remove_requires_auth_and_control_token_and_persists(client):
+    assert client.delete("/api/sockets/boiler").status_code == 401
+    assert client.delete("/api/sockets/boiler", auth=auth()).status_code == 403
+    headers = {"X-Control-Token": client.get("/api/state", auth=auth()).json()["control_token"]}
+    assert client.delete("/api/sockets/boiler", auth=auth(), headers=headers).status_code == 200
+    assert client.get("/api/state", auth=auth()).json()["sockets"] == []
+    assert client.delete("/api/sockets/boiler", auth=auth(), headers=headers).status_code == 404
+    with TestClient(create_app()) as restarted:
+        assert restarted.get("/api/state", auth=auth()).json()["sockets"] == []

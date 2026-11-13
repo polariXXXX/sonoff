@@ -3,3 +3,86 @@
 .countdown{margin:22px 0 16px;padding:18px 20px;background:#0d1c27;border:1px solid #294654;border-radius:12px}.turn-on-time{display:block;font-size:42px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:2px;color:#79e8c8;margin-top:6px}.turn-on-note{margin:5px 0 0}.timer{font-size:14px;margin:10px 0}.countdown .eyebrow{letter-spacing:1.5px}
 
 .device-profile{display:flex;align-items:center;gap:22px;margin-top:20px}.device-photo{object-fit:contain;background:#fff;border-radius:12px;flex-shrink:0}.device-model{font-size:17px;color:#e6edf5;font-weight:650;margin:0 0 6px}.device-details{font-size:12px;margin:5px 0}.device-profile .connection{margin:5px 0}.telemetry{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}.metric{background:#0e1e2a;border:1px solid #2a4151;border-radius:10px;padding:12px 18px;min-width:130px}.metric span{display:block;color:#95a8ba;font-size:12px}.metric strong{display:block;color:#c5f0e2;font-size:20px;margin-top:5px}.integration-status{font-size:12px}@media(max-width:650px){.device-profile{gap:14px;align-items:flex-start}.device-photo{width:100px;height:110px}.device-model{font-size:15px}.telemetry{gap:8px}.metric{min-width:100px;padding:10px}}
+
+.availability-info { color:#ffbb87; font-size:12px; margin:8px 0; }
+.unavailable { border-color:#70513b; }
+.unavailable .telemetry { opacity:.6; }
+.image-status { font-size:12px; margin:6px 0; color:#95a8ba; }
+.find-image { font-size:11px; padding:6px 10px; margin-top:4px; }
+.remove-device { color:#ffb3a6; border-color:#70443f; background:#3b2527; }
+.remove-device:hover { background:#633235; border-color:#d07464; }
+.device { flex-wrap:wrap; }
+.device-info { margin-top:14px; padding-top:12px; }
+.device-identifiers { font-size:12px; overflow-wrap:anywhere; }
+.log-section { margin:28px 0; border-top:0; }
+.log-section > summary { font-size:20px; font-weight:650; color:#e6edf5; margin-bottom:18px; }
+.socket { min-width:0; }
+.device-profile > div { min-width:0; }
+button { touch-action:manipulation; }
+@media (max-width:650px) {
+  main { padding:20px 12px; }
+  header { margin-bottom:20px; }
+  h1 { font-size:26px; letter-spacing:-.8px; margin:8px 0; }
+  header p { margin:4px 0; font-size:12px; }
+  header .eyebrow { font-size:9px; }
+  .overview { grid-template-columns:1fr 1fr; padding:15px; gap:12px; margin-bottom:20px; }
+  .overview .eyebrow { font-size:9px; letter-spacing:1px; }
+  .overview h2 { font-size:17px; margin:9px 0 4px; }
+  .overview p { font-size:11px; line-height:1.4; margin:4px 0; }
+  section { margin-bottom:20px; }
+  .socket { padding:16px; border-radius:14px; }
+  .socket > .section-title { flex-direction:row; align-items:center; gap:8px; }
+  .socket h3 { font-size:18px; overflow-wrap:anywhere; }
+  .badge { font-size:10px; padding:6px 9px; }
+  .device-profile { margin-top:14px; gap:12px; align-items:center; }
+  .device-photo { width:68px; height:76px; }
+  .device-model { font-size:13px; margin-bottom:4px; }
+  .device-profile .connection { font-size:11px; line-height:1.4; }
+  .availability-info { font-size:11px; line-height:1.4; }
+  .countdown { margin:14px 0 10px; padding:12px 14px; }
+  .turn-on-time { font-size:32px; margin-top:4px; letter-spacing:1px; }
+  .turn-on-note { font-size:11px; }
+  .socket > .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .socket > .actions button { width:100%; min-height:42px; padding:9px 6px; font-size:12px; }
+  .socket > .actions [data-command=auto] { font-size:11px; }
+  .device-info summary, details summary { font-size:12px; }
+  .device-info { margin-top:12px; padding-top:12px; }
+  .socket details { margin-top:16px; padding-top:12px; }
+  .telemetry { margin-top:10px; }
+  .metric { flex:1; min-width:80px; padding:9px; }
+  .metric strong { font-size:16px; }
+  .metric span { font-size:10px; }
+  .log-section { margin:22px 0; }
+  .log-section > summary { font-size:17px; margin-bottom:10px; }
+  .event { font-size:12px; padding:9px 0; }
+  #devices { max-height:360px; overflow:auto; margin-top:12px; }
+  .device { padding:10px; font-size:12px; gap:8px; }
+  .device > span { width:100%; overflow-wrap:anywhere; }
+  .device button { flex:1; min-height:40px; }
+  .integration-status { font-size:11px; line-height:1.4; }
+  footer { font-size:10px; line-height:1.5; }
+  .rules { gap:8px; }
+  .rules label { min-width:0; }
+  input, select { min-width:0; font-size:14px; }
+}
+
+#notice:empty, .socket-error:empty, .availability-info:empty, .timer:empty { display:none; }
+@media (max-width:650px) {
+  header { display:block; position:relative; margin-bottom:16px; padding-right:45px; }
+  header #mode { position:absolute; top:0; right:0; }
+  header h1 { font-size:23px; line-height:1.2; margin:8px 0 0; }
+  header p { display:none; }
+  .overview { padding:12px; margin-bottom:16px; }
+  .overview p { display:none; }
+  .integration-disabled { display:none; }
+  .section-title { gap:8px; }
+  .section-title h2 { margin:10px 0; font-size:20px; }
+  .socket { padding:14px; }
+  .device-profile { margin-top:10px; }
+  .device-photo { width:56px; height:60px; }
+  .socket details { margin-top:10px; padding-top:10px; }
+  .countdown { margin:10px 0 8px; padding:10px 12px; }
+  .turn-on-time { font-size:30px; }
+  .socket > .actions { gap:6px; }
+  .socket > .actions button { min-height:40px; }
+}

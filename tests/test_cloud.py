@@ -141,3 +141,28 @@ def test_unknown_model_uses_honest_generic_image():
     status = socket_status({"product_model": "unknown", "params": {}}, None)
     assert status["image_is_generic"] is True
     assert status["image_url"].endswith("device.svg")
+
+
+async def test_missing_portal_device_keeps_last_known_state_and_model(tmp_path):
+    store = Store(tmp_path)
+    cloud = EWeLink("app", "secret", store, "https://example.com/oauth/callback")
+    cloud.devices["boiler"] = {
+        "online": True,
+        "product_model": "THR316D",
+        "params": {"switch": "on"},
+        "updated_at": 123,
+    }
+
+    async def request(*args, **kwargs):
+        return {"thingList": []}
+
+    cloud.request = request
+    socket = Socket(device_id="boiler", name="Бойлер")
+    await cloud.poll([socket])
+    status = cloud.status(socket)
+    assert status["online"] is None
+    assert status["confirmed"] == "on"
+    assert status["updated_at"] == 123
+    assert status["product_model"] == "THR316D"
+    await cloud.close()
+    store.close()

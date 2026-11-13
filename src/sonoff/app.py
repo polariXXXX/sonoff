@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from .cloud import EWeLink, MockCloud
 from .config import Config, Socket
 from .engine import Engine
+from .images import DeviceImages
 from .notifications import Telegram
 from .sensor import GPIOSensor, MockSensor
 from .store import Store
@@ -90,6 +91,8 @@ def create_app():
             store.close()
             raise
         telegram = Telegram(store, os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID"))
+        images = DeviceImages(store)
+        app.state.images = images
         engine = Engine(config, cloud, store, notifier=telegram)
         app.state.telegram = telegram
         app.state.engine, app.state.cloud, app.state.sensor, app.state.store = (
@@ -124,6 +127,8 @@ def create_app():
         async def sync():
             while True:
                 await cloud.poll(list(config.sockets))
+                for socket in config.sockets:
+                    images.schedule(cloud.devices.get(socket.device_id, {}))
                 await asyncio.sleep(120)
 
         tasks = [asyncio.create_task(fn()) for fn in (monitor, control, sync, telegram.run)]
@@ -135,6 +140,7 @@ def create_app():
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             sensor.close()
+            await images.close()
             await telegram.close()
             await cloud.close()
             store.close()
@@ -179,8 +185,11 @@ def create_app():
 
     @app.get("/api/state", dependencies=[Depends(authenticate)])
     async def state():
+        snapshot = app.state.engine.snapshot()
+        for socket in snapshot["sockets"]:
+            socket.update(app.state.images.decorate(socket))
         return {
-            **app.state.engine.snapshot(),
+            **snapshot,
             "events": app.state.store.events(),
             "sensor_error": app.state.sensor_error,
             "cloud_error": app.state.cloud.error,
@@ -201,6 +210,14 @@ def create_app():
             app.state.engine.update(socket)
         except ValueError as error:
             raise HTTPException(400, str(error)) from None
+        app.state.images.schedule(app.state.cloud.devices.get(device_id, {}))
+        return {"ok": True}
+
+    @app.delete("/api/sockets/{device_id}", dependencies=[Depends(mutation)])
+    async def remove_socket(device_id: str):
+        if device_id not in app.state.engine.runtime:
+            raise HTTPException(404, "Unknown socket")
+        app.state.engine.remove(device_id)
         return {"ok": True}
 
     @app.post("/api/sockets/{device_id}/control", dependencies=[Depends(mutation)])
@@ -235,6 +252,23 @@ def create_app():
             ) from None
         # The cloud adapter exposes no devicekeys, apikeys or account tokens.
         return {"devices": devices}
+
+    @app.post("/api/sockets/{device_id}/image", dependencies=[Depends(mutation)])
+    async def find_image(device_id: str):
+        if device_id not in app.state.engine.runtime:
+            raise HTTPException(404, "Unknown socket")
+        device = app.state.cloud.devices.get(device_id, {})
+        if not device.get("product_model"):
+            raise HTTPException(409, "Модель ще не отримано; виконайте пошук пристроїв")
+        app.state.images.schedule(device, force=True)
+        return {"accepted": True}
+
+    @app.get("/api/device-images/{key}", dependencies=[Depends(authenticate)])
+    async def device_image(key: str):
+        path = app.state.images.path(key)
+        if path is None:
+            raise HTTPException(404, "Image not found")
+        return FileResponse(path)
 
     @app.post("/api/oauth/start", dependencies=[Depends(mutation)])
     async def oauth_start():

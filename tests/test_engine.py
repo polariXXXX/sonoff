@@ -206,3 +206,37 @@ def test_no_on_countdown_when_only_off_is_pending(setup):
     assert snapshot["desired"] == "off"
     assert snapshot["turn_on_remaining_seconds"] == 0
     assert snapshot["turn_on_scheduled"] is False
+
+
+async def test_removing_socket_cancels_on_and_does_not_switch_device(setup):
+    engine, cloud, clock, store = setup
+    engine.sample(True)
+    engine.remove("boiler")
+    clock.now = 1300
+    await engine.tick()
+    assert engine.config.sockets == []
+    assert engine.runtime == {}
+    assert cloud.devices == {}
+    assert store.get("config")["sockets"] == []
+
+
+async def test_removing_socket_invalidates_command_waiting_for_network(setup):
+    engine, _, clock, _ = setup
+    entered, resume = asyncio.Event(), asyncio.Event()
+
+    class DelayedCloud(MockCloud):
+        async def switch(self, socket, action, valid=lambda: True):
+            entered.set()
+            await resume.wait()
+            await super().switch(socket, action, valid)
+
+    engine.cloud = cloud = DelayedCloud()
+    engine.sample(True)
+    clock.now = 1200
+    task = asyncio.create_task(engine.tick())
+    await entered.wait()
+    engine.remove("boiler")
+    resume.set()
+    await task
+    assert cloud.devices == {}
+    assert engine.snapshot()["sockets"] == []

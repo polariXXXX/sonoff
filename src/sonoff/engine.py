@@ -80,6 +80,15 @@ class Engine:
         self.store.put("config", self.config.model_dump())
         self.store.event(f"Правила оновлено: {socket.name}")
 
+    def remove(self, device_id: str):
+        socket = next(s for s in self.config.sockets if s.device_id == device_id)
+        state = self.runtime.pop(device_id)
+        state.generation += 1
+        state.desired, state.due, state.manual_request = None, None, False
+        self.config.sockets = [s for s in self.config.sockets if s.device_id != device_id]
+        self.store.put("config", self.config.model_dump())
+        self.store.event(f"Пристрій видалено зі списку: {socket.name}")
+
     def manual(self, device_id: str, action: str):
         socket = next(s for s in self.config.sockets if s.device_id == device_id)
         if action == "on" and self.present is not True:
@@ -98,9 +107,13 @@ class Engine:
         self.store.put("config", self.config.model_dump())
 
     async def execute(self, socket: Socket):
-        state = self.runtime[socket.device_id]
+        state = self.runtime.get(socket.device_id)
+        if state is None:
+            return
         async with state.lock:
-            socket = next(s for s in self.config.sockets if s.device_id == socket.device_id)
+            socket = next((s for s in self.config.sockets if s.device_id == socket.device_id), None)
+            if socket is None:
+                return
             observed = self.cloud.status(socket)
             if (
                 state.desired == "on"

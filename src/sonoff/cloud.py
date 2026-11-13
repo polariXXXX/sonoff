@@ -59,6 +59,7 @@ def decode_device(item):
         "params": params,
         "brand": data.get("brandName"),
         "product_model": data.get("productModel"),
+        "model_image_url": data.get("modelPic") if isinstance(data.get("modelPic"), str) else None,
         "uiid": data.get("extra", {}).get("uiid"),
         "item_type": item.get("itemType", 1),
         "updated_at": time.time(),
@@ -327,7 +328,9 @@ class EWeLink:
                 self.devices[device["device_id"]] = device
             for socket in sockets:
                 if socket.device_id not in returned:
-                    self.devices.pop(socket.device_id, None)
+                    previous = self.devices.get(socket.device_id)
+                    if previous:
+                        self.devices[socket.device_id] = {**previous, "online": None}
             self.connected, self.error = True, None
         except Exception:
             self.connected, self.error = False, "eWeLink недоступний або потрібна авторизація"

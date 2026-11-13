@@ -25,7 +25,7 @@ Use mock GPIO/cloud adapters and injected clocks; tests never switch live socket
 
 ## Approved behavior and deployment
 
-Boiler default: OFF immediately when mains disappears, ON after 20 uninterrupted minutes of mains presence (LOW). Restart and rule edits start a new full delay. OFF-on-absence also applies in manual mode; manual ON requires confirmed presence. Preserve these semantics unless the user changes them.
+Boiler default: OFF immediately when mains disappears, ON after 20 uninterrupted minutes of mains presence (LOW). Restart and rule edits start a new full delay. Manual ON/OFF are independent of the sensor and switch the socket to manual mode. Sensor changes neither cancel manual commands nor switch manually controlled sockets. Returning to automatic mode restores sensor rules; unknown mains blocks automatic ON. Preserve these semantics unless the user changes them.
 
 The detector listing mixes TTL 3–5 V and 24 V PLC outputs: direct GPIO wiring is unconfirmed. Use GPIO17/physical pin 11 only after confirming 0–3.3 V output or suitable level conversion. Open-collector pull-up to 3.3 V requires confirmation that no 5/24 V pull-up remains.
 

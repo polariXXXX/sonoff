@@ -74,11 +74,9 @@ async def test_unknown_cancels_pending_on(setup):
     clock.now = 1300
     await engine.tick()
     assert cloud.status(engine.config.sockets[0])["confirmed"] is None
-    with pytest.raises(ValueError):
-        engine.manual("boiler", "on")
 
 
-async def test_manual_on_is_still_switched_off_during_outage(setup):
+async def test_manual_on_is_independent_of_sensor_until_auto_restored(setup):
     engine, cloud, _, _ = setup
     engine.sample(True)
     engine.manual("boiler", "on")
@@ -86,9 +84,13 @@ async def test_manual_on_is_still_switched_off_during_outage(setup):
     assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
     engine.sample(False)
     await engine.tick()
-    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
     engine.sample(True)
     assert engine.runtime["boiler"].due is None
+    engine.sample(False)
+    engine.auto("boiler")
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"
 
 
 async def test_config_change_invalidates_existing_deadline(setup):
@@ -240,3 +242,17 @@ async def test_removing_socket_invalidates_command_waiting_for_network(setup):
     await task
     assert cloud.devices == {}
     assert engine.snapshot()["sockets"] == []
+
+
+@pytest.mark.parametrize("signal", [None, False, True])
+async def test_manual_commands_survive_sensor_change_before_execution(setup, signal):
+    engine, cloud, _, _ = setup
+    engine.sample(signal)
+    engine.manual("boiler", "on")
+    engine.sample(False if signal is not False else None)
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "on"
+    engine.manual("boiler", "off")
+    engine.sample(True)
+    await engine.tick()
+    assert cloud.status(engine.config.sockets[0])["confirmed"] == "off"

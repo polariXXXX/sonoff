@@ -18,7 +18,7 @@ Use four-space indentation, type annotations, `snake_case` functions/modules, an
 
 ## Hardware & Automation
 
-Pi GPIO accepts 3.3 V digital inputs and has no analog input. Never connect mains or 5 V directly. Confirm analyzer isolation and output before final wiring. Revalidate pending actions after sensor changes and before retries; never replay stale ON commands. Distinguish desired, confirmed, offline, and unknown device states. Run exactly one automation worker. Boiler defaults are OFF immediately and ON after 20 stable minutes; startup restarts the full delay. LOW means mains present. Manual ON needs confirmed presence.
+Pi GPIO accepts 3.3 V digital inputs and has no analog input. Never connect mains or 5 V directly. Confirm analyzer isolation and output before final wiring. Revalidate pending actions after sensor changes and before retries; never replay stale ON commands. Distinguish desired, confirmed, offline, and unknown device states. Run exactly one automation worker. Boiler defaults are OFF immediately and ON after 20 stable minutes; startup restarts the full delay. LOW means mains present. Manual ON/OFF override sensor automation until automatic mode is restored; unknown mains blocks only automatic ON.
 
 ## Security & Contributions
 

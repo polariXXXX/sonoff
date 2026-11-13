@@ -40,7 +40,7 @@ def test_auth_and_csrf_required_for_control(client):
     assert response.status_code == 200
 
 
-def test_manual_on_blocked_when_sensor_unknown(client):
+def test_manual_on_accepted_when_sensor_unknown(client):
     state = client.get("/api/state", auth=auth()).json()
     response = client.post(
         "/api/sockets/boiler/control",
@@ -48,7 +48,8 @@ def test_manual_on_blocked_when_sensor_unknown(client):
         headers={"X-Control-Token": state["control_token"]},
         json={"action": "on"},
     )
-    assert response.status_code == 409
+    assert response.status_code == 200
+    assert client.app.state.engine.config.sockets[0].mode == "manual"
 
 
 def test_home_and_security_headers(client):

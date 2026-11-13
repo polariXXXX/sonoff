@@ -32,8 +32,7 @@ class Engine:
         state.generation += 1
         state.desired, state.due, state.error = None, None, None
         state.attempts, state.manual_request = 0, False
-        safety_off = self.present is False and socket.mains_absent.action == "off"
-        if self.present is None or (socket.mode != "auto" and not safety_off):
+        if self.present is None or socket.mode != "auto":
             return
         rule = socket.mains_present if self.present else socket.mains_absent
         if rule.action != "hold":
@@ -47,7 +46,8 @@ class Engine:
             # Any interruption cancels an ON, even if shorter than the input debounce.
             self.present = None
             for socket in self.config.sockets:
-                self.schedule(socket)
+                if socket.mode == "auto":
+                    self.schedule(socket)
         # Absence/unknown immediately prevents ON. Presence requires debounce first.
         stable = (
             raw
@@ -64,7 +64,8 @@ class Engine:
                 self.notifier.mains(stable)
             self.store.event(f"Мережа: { {True: 'є', False: 'немає', None: 'невідомо'}[stable] }")
             for socket in self.config.sockets:
-                self.schedule(socket)
+                if socket.mode == "auto":
+                    self.schedule(socket)
 
     def update(self, socket: Socket):
         for i, existing in enumerate(self.config.sockets):
@@ -91,8 +92,6 @@ class Engine:
 
     def manual(self, device_id: str, action: str):
         socket = next(s for s in self.config.sockets if s.device_id == device_id)
-        if action == "on" and self.present is not True:
-            raise ValueError("ON requires confirmed mains presence")
         socket.mode = "manual"
         self.schedule(socket)
         state = self.runtime[device_id]
@@ -131,11 +130,10 @@ class Engine:
                 self.store.event(f"Розетка вже увімкнена; таймер ON скасовано: {socket.name}")
             if state.due is None or self.clock() < state.due:
                 return
-            if state.desired == "on" and self.present is not True:
+            if state.desired == "on" and not state.manual_request and self.present is not True:
                 self.schedule(socket)
                 return
-            safety_off = self.present is False and state.desired == "off"
-            if socket.mode != "auto" and not state.manual_request and not safety_off:
+            if socket.mode != "auto" and not state.manual_request:
                 return
             generation, desired = state.generation, state.desired
             source = "manual" if state.manual_request else "auto"
@@ -144,7 +142,7 @@ class Engine:
                     socket,
                     desired,
                     valid=lambda: generation == state.generation
-                    and (desired != "on" or self.present is True),
+                    and (source == "manual" or desired != "on" or self.present is True),
                 )
             except Exception:
                 if generation == state.generation:

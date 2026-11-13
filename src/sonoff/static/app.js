@@ -78,7 +78,7 @@ async function refresh() {
     $('#mode').textContent=latest.simulation?'СИМУЛЯЦІЯ':'LIVE';
     $('#mains').textContent=latest.mains===true?'Живлення стабільне':latest.mains===false?'Живлення відсутнє':'Стан невідомий';
     $('#mains').className=latest.mains===true?'good':'bad';
-    $('#sensor').textContent=latest.sensor_error || (latest.mains===null?'Сигнал датчика невідомий · увімкнення заблоковане':latest.sensor_simulation?'Віртуальний датчик':'Цифровий датчик · LOW = мережа є');
+    $('#sensor').textContent=latest.sensor_error || (latest.mains===null?'Сигнал датчика невідомий · автоматичне увімкнення заблоковане':latest.sensor_simulation?'Віртуальний датчик':'Цифровий датчик · LOW = мережа є');
     $('#cloud').textContent=latest.cloud_connected?'Підключено':'Немає зв’язку';
     $('#simulation').hidden=!latest.sensor_simulation;
     if(latest.cloud_error) notify(latest.cloud_error);
@@ -114,10 +114,10 @@ async function refresh() {
       node.classList.toggle('unavailable',s.online!==true);
       const lastState = s.confirmed==='on'?'увімкнений':s.confirmed==='off'?'вимкнений':'невідомий';
       node.querySelector('.availability-info').textContent=s.online===true?'':`${s.online===false?'Пристрій офлайн у eWeLink':latest.cloud_connected?'Пристрій відсутній у списку порталу або ще не синхронізований':'Зв’язок із eWeLink недоступний'}. Останній відомий стан: ${lastState}. Показники можуть бути застарілими.`;
-      node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'}`;
+      node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим · датчик не керує'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'}`;
       node.querySelector('.device-identifiers').textContent=`ID: ${s.device_id}${s.updated_at?' · Оновлено '+new Date(s.updated_at*1000).toLocaleString('uk-UA'):''}`;
       node.querySelector('.socket-error').textContent=s.error||'';
-      const onReason = s.online !== true ? 'Керування недоступне: розетка не має підтвердженого зв’язку з eWeLink.' : latest.mains === false ? 'Увімкнення заблоковане: мережа 220 В відсутня.' : latest.mains !== true ? (latest.sensor_simulation ? 'Увімкнення заблоковане: виберіть «Мережа є» у тестовому датчику вгорі.' : 'Увімкнення заблоковане: датчик ще не підтвердив наявність мережі 220 В.') : '';
+      const onReason = s.online !== true ? 'Керування недоступне: розетка не має підтвердженого зв’язку з eWeLink.' : '';
       node.querySelector('.control-hint').textContent = onReason;
       const onButton = node.querySelector('[data-command=on]');
       onButton.disabled = Boolean(onReason);

@@ -117,8 +117,14 @@ async function refresh() {
       node.querySelector('.connection').textContent=`${s.mode==='auto'?'Автоматичний режим':'Ручний режим'} · ${s.online===true?'онлайн':s.online===false?'офлайн':'зв’язок невідомий'}`;
       node.querySelector('.device-identifiers').textContent=`ID: ${s.device_id}${s.updated_at?' · Оновлено '+new Date(s.updated_at*1000).toLocaleString('uk-UA'):''}`;
       node.querySelector('.socket-error').textContent=s.error||'';
-      node.querySelector('[data-command=on]').disabled=latest.mains!==true || s.online!==true;
-      node.querySelector('[data-command=off]').disabled=s.online!==true;
+      const onReason = s.online !== true ? 'Керування недоступне: розетка не має підтвердженого зв’язку з eWeLink.' : latest.mains === false ? 'Увімкнення заблоковане: мережа 220 В відсутня.' : latest.mains !== true ? (latest.sensor_simulation ? 'Увімкнення заблоковане: виберіть «Мережа є» у тестовому датчику вгорі.' : 'Увімкнення заблоковане: датчик ще не підтвердив наявність мережі 220 В.') : '';
+      node.querySelector('.control-hint').textContent = onReason;
+      const onButton = node.querySelector('[data-command=on]');
+      onButton.disabled = Boolean(onReason);
+      onButton.title = onReason || 'Увімкнути розетку вручну';
+      const offButton = node.querySelector('[data-command=off]');
+      offButton.disabled = s.online !== true;
+      offButton.title = s.online !== true ? 'Розетка недоступна в eWeLink' : 'Вимкнути розетку вручну';
       node.querySelector('[data-command=auto]').disabled=false;
     }
     renderCountdowns();

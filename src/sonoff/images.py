@@ -13,6 +13,13 @@ CATALOGUE = {
     "THR316D": "https://i0.wp.com/itead.cc/wp-content/uploads/2022/09/TH-Elite-.jpg",
     "THR320D": "https://i0.wp.com/itead.cc/wp-content/uploads/2022/09/TH-Elite-.jpg",
 }
+# User-selected photo for the model label reported by this account.
+IMAGE_OVERRIDES = {
+    ("SONOFF", "POW"): (
+        "https://homesmart.com.ua/content/images/3/390x390l80nn0/"
+        "rele-wi-fi-sonoff-basic-r4-62663740065121.jpeg"
+    ),
+}
 IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
@@ -35,6 +42,8 @@ def allowed_url(url):
         "cn-ota.coolkit.cn",
     ):
         return True
+    if url in IMAGE_OVERRIDES.values():
+        return True
     return parsed.hostname in ("i0.wp.com", "i1.wp.com", "i2.wp.com") and parsed.path.startswith(
         "/itead.cc/"
     )
@@ -43,7 +52,9 @@ def allowed_url(url):
 def image_key(device):
     brand = str(device.get("brand") or "SONOFF").strip().upper()
     model = str(device.get("product_model") or "").strip().upper()
-    return hashlib.sha256(f"{brand}:{model}".encode()).hexdigest() if model else None
+    override = IMAGE_OVERRIDES.get((brand, model))
+    identity = f"{brand}:{model}" + (f":{override}" if override else "")
+    return hashlib.sha256(identity.encode()).hexdigest() if model else None
 
 
 class DeviceImages:
@@ -90,6 +101,12 @@ class DeviceImages:
         self.tasks[key] = asyncio.create_task(self.resolve(dict(device), key))
 
     async def candidates(self, device):
+        brand = str(device.get("brand") or "SONOFF").strip().upper()
+        model = str(device.get("product_model") or "").strip().upper()
+        override = IMAGE_OVERRIDES.get((brand, model))
+        if override:
+            yield override
+            return
         # The cloud may provide an actual image URL; a brand logo is never a device image.
         candidate = device.get("model_image_url")
         if isinstance(candidate, str) and allowed_url(candidate):

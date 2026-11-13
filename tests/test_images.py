@@ -2,7 +2,7 @@ import asyncio
 
 import httpx
 
-from sonoff.images import DeviceImages, allowed_url, image_key
+from sonoff.images import IMAGE_OVERRIDES, DeviceImages, allowed_url, image_key
 from sonoff.store import Store
 
 JPEG = b"\xff\xd8\xff" + b"test image"
@@ -137,5 +137,20 @@ async def test_missing_cached_file_is_automatically_downloaded_again(tmp_path):
     await asyncio.gather(*images.tasks.values())
     assert images.path(image_key(device)).read_bytes() == JPEG
     assert images.decorate(device)["image_url"] != old_url
+    await images.close()
+    store.close()
+
+
+async def test_pow_uses_user_selected_photo_before_cloud_photo(tmp_path):
+    store = Store(tmp_path)
+    images = DeviceImages(store)
+    device = {
+        "brand": "Sonoff", "product_model": "Pow",
+        "model_image_url": "https://itead.cc/wrong.jpg",
+    }
+    candidates = [url async for url in images.candidates(device)]
+    assert candidates == [IMAGE_OVERRIDES[("SONOFF", "POW")]]
+    assert allowed_url(candidates[0])
+    assert not allowed_url("https://homesmart.com.ua/other.jpeg")
     await images.close()
     store.close()

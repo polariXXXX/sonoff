@@ -187,6 +187,9 @@ def create_app():
     async def state():
         snapshot = app.state.engine.snapshot()
         for socket in snapshot["sockets"]:
+            device = app.state.cloud.devices.get(socket["device_id"])
+            if device and device.get("product_model"):
+                app.state.images.schedule(device)
             socket.update(app.state.images.decorate(socket))
         return {
             **snapshot,

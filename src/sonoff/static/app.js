@@ -97,7 +97,8 @@ async function refresh() {
       if(!node){node=card(s);container.append(node);}
       const image = node.querySelector('.device-photo');
       if (image.getAttribute('src') !== s.image_url) image.src = s.image_url;
-      node.querySelector('.image-status').textContent = ({searching:'Шукаємо фото за моделлю…', pending:'Очікуємо модель пристрою', not_found:'Фото моделі не знайдено', error:s.image_error || 'Пошук фото тимчасово недоступний', found:'Фото моделі завантажено'})[s.image_status] || '';
+      node.querySelector('.image-status').textContent = ({searching:'Шукаємо фото…', pending:'Очікуємо модель пристрою', not_found:'Фото моделі не знайдено', error:s.image_error || 'Пошук фото тимчасово недоступний', found:''})[s.image_status] || '';
+      node.querySelector('.find-image').textContent = s.image_status === 'searching' ? 'Пошук…' : s.image_is_generic ? 'Знайти фото' : 'Оновити фото';
       node.querySelector('.find-image').disabled = !s.product_model || s.image_status === 'searching';
       image.alt = s.image_is_generic ? 'Типове зображення пристрою' : `${s.brand || 'SONOFF'} ${s.product_model || ''}`;
       node.querySelector('.device-model').textContent = [s.brand, s.product_model].filter(Boolean).join(' · ') || 'Модель ще не отримано';

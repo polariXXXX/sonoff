@@ -67,7 +67,10 @@ class DeviceImages:
         if record:
             result.update(image_status=record["status"], image_error=record.get("error"))
             if record["status"] == "found" and (self.directory / record["filename"]).is_file():
-                result.update(image_url=f"/api/device-images/{key}", image_is_generic=False)
+                result.update(
+                    image_url=f"/api/device-images/{key}?v={record["checked_at"]}",
+                    image_is_generic=False,
+                )
             elif record["status"] == "found":
                 result["image_status"] = "pending"
         if key in self.tasks:

@@ -115,3 +115,27 @@ def test_image_urls_reject_credentials_private_hosts_and_wrong_scheme():
     assert not allowed_url("https://user:password@itead.cc/photo.jpg")
     assert not allowed_url("https://i0.wp.com/other.example/private.jpg")
     assert allowed_url("https://i0.wp.com/itead.cc/wp-content/uploads/photo.jpg")
+
+
+async def test_missing_cached_file_is_automatically_downloaded_again(tmp_path):
+    store = Store(tmp_path)
+    images = DeviceImages(store)
+    await images.client.aclose()
+    images.client = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200, content=JPEG, headers={"content-type": "image/jpeg"}
+            )
+        )
+    )
+    device = {"brand": "SONOFF", "product_model": "THR316"}
+    images.schedule(device)
+    await asyncio.gather(*images.tasks.values())
+    old_url = images.decorate(device)["image_url"]
+    images.path(image_key(device)).unlink()
+    images.schedule(device)
+    await asyncio.gather(*images.tasks.values())
+    assert images.path(image_key(device)).read_bytes() == JPEG
+    assert images.decorate(device)["image_url"] != old_url
+    await images.close()
+    store.close()

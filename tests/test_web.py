@@ -162,3 +162,12 @@ def test_remove_requires_auth_and_control_token_and_persists(client):
     assert client.delete("/api/sockets/boiler", auth=auth(), headers=headers).status_code == 404
     with TestClient(create_app()) as restarted:
         assert restarted.get("/api/state", auth=auth()).json()["sockets"] == []
+
+
+def test_state_schedules_image_lookup_for_existing_device(client, monkeypatch):
+    device = {"device_id": "boiler", "brand": "SONOFF", "product_model": "THR316"}
+    client.app.state.cloud.devices["boiler"] = device
+    scheduled = []
+    monkeypatch.setattr(client.app.state.images, "schedule", scheduled.append)
+    assert client.get("/api/state", auth=auth()).status_code == 200
+    assert scheduled == [device]
